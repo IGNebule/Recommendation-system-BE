@@ -111,7 +111,10 @@ const getPersonalized = async (req, res) => {
     }));
 
     fs.writeFileSync(
-      path.join(__dirname, "../../../preprocessing/evaluation/logs.json"),
+      path.join(
+        __dirname,
+        "../../../research/preprocessing/evaluation/logs.json",
+      ),
       JSON.stringify(
         {
           user: req.user.email,

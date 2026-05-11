@@ -7,21 +7,21 @@ const getGames = async () => {
         const results = []
 
         fs.createReadStream(
-          path.join(__dirname, "../../../data/raw/steam.csv"),
+          path.join(__dirname, "../../../research/data/raw/steam.csv"),
         )
-            .pipe(csv())
-            .on("data", (data) => {
-                results.push({
-                    appid: data.appid,
-                    name: data.name,
-                    genres: data.genres,
-                    price: data.price,
-                })
-            })
-            .on("end", () => {
-                resolve(results.slice(0, 100))
-            })
-            .on("error", reject)
+          .pipe(csv())
+          .on("data", (data) => {
+            results.push({
+              appid: data.appid,
+              name: data.name,
+              genres: data.genres,
+              price: data.price,
+            });
+          })
+          .on("end", () => {
+            resolve(results.slice(0, 100));
+          })
+          .on("error", reject);
     })
 }
 
