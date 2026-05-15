@@ -2,7 +2,7 @@ const service = require("./services")
 
 const getGames = async (req, res) => {
     try {
-        const games = await service.getGames()
+        const games = await service.loadGames()
 
         res.json(games)
     } catch (err) {
