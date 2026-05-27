@@ -1,51 +1,77 @@
 const axios = require("axios");
+const User = require("../../models/user");
+const { parseGames } = require("../games/services");
+const { toGameCard } = require("../games/serializers");
 
-const getRecommendations = async (gameName) => {
-  const response = await axios.post("http://127.0.0.1:8000/recommend", {
-    game_name: gameName,
-    top_n: 5,
-  });
+const enrichGames = async (recommendations) => {
+  const { map } = await parseGames();
 
-  return response.data.recommendations;
+  return recommendations
+    .map((rec) => {
+      const game = map.get(String(rec.appid));
+
+      if (!game) return null;
+
+      return toGameCard(game, {
+        similarity_score: Number(rec.score.toFixed(4)),
+      });
+    })
+    .filter(Boolean);
 };
 
-const generatePersonalizedRecommendations = async (preferences) => {
+const requestRecommendations = async (appid, top_n = 10) => {
+  const res = await axios.post(process.env.ML_SERVICE_URL, {
+    appid: String(appid),
+    top_n,
+  });
+
+  return res.data.recommendations || [];
+};
+
+const getRecommendations = async (appid) => {
+  const recommendations = await requestRecommendations(appid, 10);
+
+  return enrichGames(recommendations);
+};
+
+const generatePersonalizedRecommendations = async (email) => {
+  const user = await User.findOne({
+    email,
+  });
+
+  if (!user || !user.preferences?.length) {
+    return [];
+  }
+
   const scoreMap = {};
 
-  for (const prefGame of preferences) {
-    const recs = await getRecommendations(prefGame);
+  for (const appid of user.preferences) {
+    const recs = await requestRecommendations(appid, 5);
 
     recs.forEach((rec) => {
-      const gameName = rec.game;
-      const simScore = rec.score;
+      const recAppid = String(rec.appid);
 
-      // skip existing preferences
-      if (preferences.includes(gameName)) {
+      if (user.preferences.includes(recAppid)) {
         return;
       }
 
-      if (!scoreMap[gameName]) {
-        scoreMap[gameName] = 0;
+      if (!scoreMap[recAppid]) {
+        scoreMap[recAppid] = 0;
       }
 
-      scoreMap[gameName] += simScore;
+      scoreMap[recAppid] += Number(rec.score) || 0;
     });
   }
 
-  const totalPreferences = preferences.length;
-
   const ranked = Object.entries(scoreMap)
-    .map(([game, totalScore]) => ({
-      game,
-      score: totalScore / totalPreferences,
+    .map(([appid, totalScore]) => ({
+      appid,
+      score: totalScore / user.preferences.length,
     }))
     .sort((a, b) => b.score - a.score)
-    .map((item) => ({
-      game: item.game,
-      score: Number(item.score.toFixed(4)),
-    }));
+    .slice(0, 20);
 
-  return ranked;
+  return enrichGames(ranked);
 };
 
 module.exports = {

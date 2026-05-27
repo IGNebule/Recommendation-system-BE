@@ -1,9 +1,8 @@
-// modules/recommend/routes.js
 const express = require('express')
 const router = express.Router()
+
 const controller = require('./controller')
 
-router.get('/', controller.getPersonalized)
-router.get('/game/:appid', controller.getRecommend)
+router.get('/', controller.searchGames)
 
 module.exports = router

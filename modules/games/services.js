@@ -2,30 +2,82 @@ const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parser");
 
-let cachedGames = null;
+const { toGameCard, toGameDetail } = require('./serializers')
 
-const loadGames = () => {
+let cachedGames = null;
+let gamesMap = null;
+
+const safeJsonParse = (str, fallback = null) => {
+  if (!str || str === "nan" || str === "None" || str === "[]") {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    console.warn("JSON parse failed:", String(str).slice(0, 100));
+    return fallback;
+  }
+};
+
+const normalizeText = (text = "") => {
+  return String(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const extractTerms = (text = "") => {
+  const normalized = normalizeText(text);
+
+  if (!normalized) return [];
+
+  return normalized
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const unique = (items = []) => {
+  return [...new Set(items)];
+};
+
+const buildBrowseText = ({ genres, categories, tags }) => {
+  return normalizeText(`
+    ${genres || ""}
+    ${categories || ""}
+    ${tags || ""}
+  `);
+};
+
+const parseGames = () => {
   return new Promise((resolve, reject) => {
-    if (cachedGames) {
-      return resolve(cachedGames.slice(0, 15));
+    if (cachedGames && gamesMap) {
+      return resolve({
+        games: cachedGames,
+        map: gamesMap,
+      });
     }
 
     const results = [];
+    const map = new Map();
 
     fs.createReadStream(
       path.join(__dirname, "../../../research/data/processed/games_ui.csv"),
     )
       .pipe(csv())
       .on("data", (data) => {
-        // Parse JSON fields from CSV (now properly serialized as JSON)
         const movies = safeJsonParse(data.movies, []);
         const screenshots = safeJsonParse(data.screenshots, []);
 
-        // Extract first movie video URL (prefer webm max, fallback to 480)
         let movieVideo = null;
+
         if (movies.length > 0) {
           const first = movies[0];
+
           movieVideo =
+            first.video ||
             first.webm_max ||
             first.webm_480 ||
             first.mp4_max ||
@@ -33,44 +85,113 @@ const loadGames = () => {
             null;
         }
 
-        results.push({
-          appid: data.appid,
+        const genres = data.genres || "";
+        const categories = data.categories || "";
+        const tags = data.tags_text || data.tags || "";
+
+        const genreList = extractTerms(genres);
+        const categoryList = extractTerms(categories);
+        const tagList = extractTerms(tags);
+
+        const browseText = buildBrowseText({
+          genres,
+          categories,
+          tags,
+        });
+
+        const browseTerms = unique([...genreList, ...categoryList, ...tagList]);
+
+        const gameObject = {
+          appid: String(data.appid).trim(),
           name: data.name,
+          search_name: data.search_name,
+
           release_date: data.release_date,
+          release_year: data.release_year,
+
           developer: data.developer,
           publisher: data.publisher,
-          categories: data.categories,
+
+          // raw text fields
+          genres,
+          categories,
+          tags,
+
+          // extracted arrays
+          genreList,
+          categoryList,
+          tagList,
+
+          // combined searchable/browsable fields
+          browseText,
+          browseTerms,
+
           positive_ratings: data.positive_ratings,
           negative_ratings: data.negative_ratings,
+          total_reviews: data.total_reviews,
+          rating_percent: data.rating_percent,
+
           average_playtime: data.average_playtime,
           median_playtime: data.median_playtime,
-          short_description: data.short_description,
-          background: data.background,
-          screenshots, // parsed array of full URLs
-          movies, // parsed array of movie objects
-          movieVideo, // direct video URL for <video> tag
-          header_image: data.header_image,
-          genres: data.genres,
+
           price: data.price,
-        });
+          short_description: data.short_description,
+
+          background: data.background,
+          screenshots,
+          movies,
+          movieVideo,
+          header_image: data.header_image,
+
+          trending_score: data.trending_score,
+        };
+
+        results.push(gameObject);
+        map.set(gameObject.appid, gameObject);
       })
       .on("end", () => {
         cachedGames = results;
-        resolve(results.slice(0, 15));
+        gamesMap = map;
+
+        resolve({
+          games: results,
+          map,
+        });
       })
-      .on("error", (err) => reject(err));
+      .on("error", reject);
   });
 };
 
-// Safe JSON parse with fallback
-function safeJsonParse(str, fallback = null) {
-  if (!str || str === "nan" || str === "None" || str === "[]") return fallback;
-  try {
-    return JSON.parse(str);
-  } catch (e) {
-    console.warn("JSON parse failed:", str.slice(0, 100));
-    return fallback;
-  }
-}
+const loadGames = async ({ page = 1, limit = 15 }) => {
+  const { games } = await parseGames();
 
-module.exports = { loadGames };
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+
+  const paginatedGames = games
+    .slice(startIndex, endIndex)
+    .map((game) => toGameCard(game))
+
+  return {
+    page,
+    limit,
+    total: games.length,
+    totalPages: Math.ceil(games.length / limit),
+    data: paginatedGames,
+  };
+};
+
+const getGameById = async (appid) => {
+  const { map } = await parseGames();
+  const game = map.get(String(appid).trim())
+
+  if (!game) return null
+
+  return toGameDetail(game)
+};
+
+module.exports = {
+  loadGames,
+  getGameById,
+  parseGames,
+};
