@@ -4,6 +4,6 @@ const router = express.Router()
 const controller = require('./controller')
 
 router.get('/', controller.getPersonalized)
-router.get('/game/:appid', controller.getRecommend)
+router.get('/:appid', controller.getRecommend)
 
 module.exports = router

@@ -1,37 +1,37 @@
 const service = require("./services");
 
-const getTopics = async (req, res) => {
+const getGenres = async (req, res) => {
   try {
-    const topics = await service.getTopics();
+    const genres = await service.getGenres();
 
     return res.json({
-      total: topics.length,
-      topics,
+      total: genres.length,
+      genres,
     });
   } catch (err) {
     console.error(err);
 
     return res.status(500).json({
-      error: "Failed to fetch genre topics",
+      error: "Failed to fetch genres",
     });
   }
 };
 
-const getGamesByTopic = async (req, res) => {
+const getGamesByGenre = async (req, res) => {
   try {
     const { genre } = req.params;
 
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 15;
 
-    const result = await service.getGamesByTopic({
-      topic: genre,
+    const result = await service.getGamesByGenre({
+      genre,
       page,
       limit,
     });
 
     return res.json({
-      topic: genre,
+      genre,
       ...result,
     });
   } catch (err) {
@@ -44,6 +44,6 @@ const getGamesByTopic = async (req, res) => {
 };
 
 module.exports = {
-  getTopics,
-  getGamesByTopic,
+  getGenres,
+  getGamesByGenre,
 };

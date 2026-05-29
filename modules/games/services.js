@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parser");
 
-const { toGameCard, toGameDetail } = require('./serializers')
+const { toGameCard, toGameDetail } = require("./serializers");
 
 let cachedGames = null;
 let gamesMap = null;
@@ -87,19 +87,19 @@ const parseGames = () => {
 
         const genres = data.genres || "";
         const categories = data.categories || "";
-        const tags = data.tags_text || data.tags || "";
+        const tags = data.tags_text || "";
 
-        const genreList = extractTerms(genres);
-        const categoryList = extractTerms(categories);
-        const tagList = extractTerms(tags);
+        const genreList = safeJsonParse(data.genres_list, []);
+        const categoryList = safeJsonParse(data.categories_list, []);
+        const tagList = safeJsonParse(data.tags_list, []);
+
+        const browseTerms = unique([...genreList, ...categoryList, ...tagList]);
 
         const browseText = buildBrowseText({
           genres,
           categories,
           tags,
         });
-
-        const browseTerms = unique([...genreList, ...categoryList, ...tagList]);
 
         const gameObject = {
           appid: String(data.appid).trim(),
@@ -170,7 +170,7 @@ const loadGames = async ({ page = 1, limit = 15 }) => {
 
   const paginatedGames = games
     .slice(startIndex, endIndex)
-    .map((game) => toGameCard(game))
+    .map((game) => toGameCard(game));
 
   return {
     page,
@@ -183,11 +183,11 @@ const loadGames = async ({ page = 1, limit = 15 }) => {
 
 const getGameById = async (appid) => {
   const { map } = await parseGames();
-  const game = map.get(String(appid).trim())
+  const game = map.get(String(appid).trim());
 
-  if (!game) return null
+  if (!game) return null;
 
-  return toGameDetail(game)
+  return toGameDetail(game);
 };
 
 module.exports = {

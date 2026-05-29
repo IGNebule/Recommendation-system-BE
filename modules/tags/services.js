@@ -22,33 +22,31 @@ const paginate = (items, page, limit) => {
   };
 };
 
-const getGenres = async () => {
+const getTags = async () => {
   const { games } = await parseGames();
 
-  const genreSet = new Set();
+  const tagSet = new Set();
 
   games.forEach((game) => {
-    game.genreList?.forEach((genre) => {
-      const normalizedGenre = normalize(genre);
+    game.tagList?.forEach((tag) => {
+      const normalizedTag = normalize(tag);
 
-      if (normalizedGenre) {
-        genreSet.add(normalizedGenre);
+      if (normalizedTag) {
+        tagSet.add(normalizedTag);
       }
     });
   });
 
-  return Array.from(genreSet).sort();
+  return Array.from(tagSet).sort();
 };
 
-const getGamesByGenre = async ({ genre, page = 1, limit = 15 }) => {
+const getGamesByTag = async ({ tag, page = 1, limit = 15 }) => {
   const { games } = await parseGames();
 
-  const normalizedGenre = normalize(genre);
+  const normalizedTag = normalize(tag);
 
   const filteredGames = games.filter((game) => {
-    return game.genreList
-      ?.map((item) => normalize(item))
-      .includes(normalizedGenre);
+    return game.tagList?.map((item) => normalize(item)).includes(normalizedTag);
   });
 
   const serializedGames = filteredGames.map((game) => toGameCard(game));
@@ -57,6 +55,6 @@ const getGamesByGenre = async ({ genre, page = 1, limit = 15 }) => {
 };
 
 module.exports = {
-  getGenres,
-  getGamesByGenre,
+  getTags,
+  getGamesByTag,
 };
