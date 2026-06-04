@@ -29,7 +29,19 @@ const toGameCard = (game, extra = {}) => {
     price: game.price,
 
     header_image: game.header_image,
+    background: game.background,
+
     movieVideo: game.movieVideo,
+
+    // clean URL array for frontend
+    screenshots: game.screenshotUrls || [],
+
+    // single preferred screenshot for GameBanner
+    bannerScreenshot: game.bannerScreenshot,
+
+    short_description: game.short_description,
+
+    trending_score: game.trending_score,
 
     trending_score: game.trending_score,
 

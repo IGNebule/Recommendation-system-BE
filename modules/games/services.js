@@ -7,6 +7,35 @@ const { toGameCard, toGameDetail } = require("./serializers");
 let cachedGames = null;
 let gamesMap = null;
 
+const toHttps = (url) => {
+  if (!url) return null;
+
+  return String(url).replace(/^http:/, "https:");
+};
+
+const extractScreenshotUrl = (screenshot) => {
+  if (!screenshot) return null;
+
+  if (typeof screenshot === "string") {
+    return toHttps(screenshot);
+  }
+
+  return toHttps(
+    screenshot.path_full ||
+      screenshot.path_thumbnail ||
+      screenshot.full ||
+      screenshot.thumbnail ||
+      screenshot.url ||
+      null,
+  );
+};
+
+const extractScreenshotUrls = (screenshots = []) => {
+  if (!Array.isArray(screenshots)) return [];
+
+  return screenshots.map(extractScreenshotUrl).filter(Boolean);
+};
+
 const safeJsonParse = (str, fallback = null) => {
   if (!str || str === "nan" || str === "None" || str === "[]") {
     return fallback;
@@ -70,6 +99,9 @@ const parseGames = () => {
       .on("data", (data) => {
         const movies = safeJsonParse(data.movies, []);
         const screenshots = safeJsonParse(data.screenshots, []);
+        const screenshotUrls = extractScreenshotUrls(screenshots);
+        const bannerScreenshot =
+          screenshotUrls[0] || data.background || data.header_image || null;
 
         let movieVideo = null;
 
@@ -139,6 +171,8 @@ const parseGames = () => {
 
           background: data.background,
           screenshots,
+          screenshotUrls,
+          bannerScreenshot,
           movies,
           movieVideo,
           header_image: data.header_image,

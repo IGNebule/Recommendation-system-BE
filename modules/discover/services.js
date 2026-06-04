@@ -20,12 +20,26 @@ const paginate = (items, page, limit) => {
     }
 }
 
+const filterByMinYear = (games = [], minYear) => {
+    if (!minYear) return games
+
+    return games.filter((game) => {
+        const releaseYear = Number(game.release_year)
+
+        return Number.isFinite(releaseYear) && releaseYear >= minYear
+    })
+}
+
 const getTrendingGames = async ({
     page = 1,
-    limit = 15
-}) => {
+    limit = 15,
+    minYear
+} = {}) => {
     const { games } = await parseGames()
-    const sortedGames = [...games]
+
+    const filteredGames = filterByMinYear(games, minYear)
+
+    const sortedGames = filteredGames
         .filter((game) => toNumber(game.trending_score) > 0)
         .sort((a, b) => {
             return toNumber(b.trending_score) - toNumber(a.trending_score)
@@ -39,10 +53,13 @@ const getTopRatedGames = async ({
     page = 1,
     limit = 15,
     minReviews = 100,
-}) => {
+    minYear
+} = {}) => {
     const { games } = await parseGames()
 
-    const sortedGames = [...games]
+    const filteredGames = filterByMinYear(games, minYear)
+
+    const sortedGames = filteredGames
         .filter((game) => {
             return toNumber(game.total_reviews) >= minReviews
         })
@@ -56,11 +73,14 @@ const getTopRatedGames = async ({
 
 const getMostPlayedGames = async ({
     page = 1,
-    limit = 15
+    limit = 15,
+    minYear
 }) => {
     const { games } = await parseGames()
 
-    const sortedGames = [...games]
+    const filteredGames = filterByMinYear(games, minYear)
+
+    const sortedGames = filteredGames
      .filter((game) => toNumber(game.average_playtime) > 0)
      .sort((a, b) => {
         return toNumber(b.average_playtime) - toNumber(a.average_playtime)
