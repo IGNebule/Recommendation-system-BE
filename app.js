@@ -14,12 +14,22 @@ const gameRoutes = require("./modules/games/routes");
 const searchRoutes = require("./modules/search/routes");
 const reviewRoutes = require("./modules/reviews/routes")
 const profileRoutes = require("./modules/profile/routes")
+const reportsRoutes = require("./modules/reports/routes")
 
 const authMiddleware = require("./middleware/auth");
 
 const app = express();
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL,
+].filter(Boolean)
 
-app.use(cors());
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -40,6 +50,8 @@ app.use("/api/tags", tagRoutes);
 
 // hit {trending: trending_score, top-rated: rating_percent, most-played: average_playtime}
 app.use("/api/discover", discoverRoutes);
+
+app.use("/api/reports", reportsRoutes);
 
 // hit
 app.use("/api/search", searchRoutes);

@@ -18,7 +18,7 @@ const startServer = async () => {
     } catch (err) {
         console.error("Failed to warm game cache: ", err)
 
-        app.listen(PORT, () => {
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Server running on port ${PORT}`)
         })
     }

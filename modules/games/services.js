@@ -223,7 +223,7 @@ const parseGames = () => {
     const map = new Map();
 
     fs.createReadStream(
-      path.join(__dirname, "../../../research/data/processed/games_ui.csv"),
+      path.join(__dirname, "../../data/processed/games_ui.csv"),
     )
       .pipe(csv())
       .on("data", (data) => {

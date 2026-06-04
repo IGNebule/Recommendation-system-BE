@@ -2,36 +2,60 @@ const service = require("./services");
 
 const getPreferences = async (req, res) => {
   try {
-    const email = req.user.email;
-    const preferences = await service.getUserPreferences(email);
+    const result = await service.getLibrary(req.user.email);
 
-    return res.json({
-      preferences,
-    });
+    return res.json(result);
   } catch (err) {
     console.error(err);
 
     return res.status(500).json({
-      error: "Failed to fetch preferences",
+      error: "Failed to fetch library",
     });
   }
 };
 
-const savePreference = async (req, res) => {
+const addPreference = async (req, res) => {
   try {
     const { appid } = req.params;
-    const email = req.user.email;
-    const preferences = await service.saveUserPreference(email, appid);
+
+    const result = await service.addPreference({
+      email: req.user.email,
+      appid,
+    });
 
     return res.json({
-      message: "preference saved",
-      preferences,
+      message: "Game added to library",
+      ...result,
     });
   } catch (err) {
     console.error(err);
 
     return res.status(500).json({
-      error: "Failed to save preference",
+      error: "Failed to add preference",
+    });
+  }
+};
+
+const updatePreferenceWeight = async (req, res) => {
+  try {
+    const { appid } = req.params;
+    const { weight } = req.body;
+
+    const result = await service.updatePreferenceWeight({
+      email: req.user.email,
+      appid,
+      weight,
+    });
+
+    return res.json({
+      message: "Preference weight updated",
+      ...result,
+    });
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Failed to update preference weight",
     });
   }
 };
@@ -39,24 +63,28 @@ const savePreference = async (req, res) => {
 const removePreference = async (req, res) => {
   try {
     const { appid } = req.params;
-    const email = req.user.email
-    const preferences = await service.removeUserPreference(email, appid)
+
+    const result = await service.removePreference({
+      email: req.user.email,
+      appid,
+    });
 
     return res.json({
-        message: "Preference removed",
-        preferences,
-    })
+      message: "Game removed from library",
+      ...result,
+    });
   } catch (err) {
-    console.error(err)
+    console.error(err);
 
     return res.status(500).json({
-        error: "Failed to remove preference"
-    })
+      error: "Failed to remove preference",
+    });
   }
 };
 
 module.exports = {
-    getPreferences,
-    savePreference,
-    removePreference
-}
+  getPreferences,
+  addPreference,
+  updatePreferenceWeight,
+  removePreference,
+};
