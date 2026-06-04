@@ -10,10 +10,12 @@ const toGameCard = (game, extra = {}) => {
     developer: game.developer,
     publisher: game.publisher,
 
+    plaforms: game.plaforms,
     genres: game.genres,
     categories: game.categories,
     tags: game.tags,
 
+    plaformList: game.plaformList,
     genreList: game.genreList,
     categoryList: game.categoryList,
     tagList: game.tagList,

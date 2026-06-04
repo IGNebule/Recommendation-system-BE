@@ -6,6 +6,8 @@ const { toGameCard, toGameDetail } = require("./serializers");
 
 let cachedGames = null;
 let gamesMap = null;
+let loadingPromise = null;
+let cacheLoadedAt = null
 
 const toHttps = (url) => {
   if (!url) return null;
@@ -72,6 +74,31 @@ const unique = (items = []) => {
   return [...new Set(items)];
 };
 
+const sortGames = (games = [], sort = "trending") => {
+  const sortedGames = [...games];
+
+  if (sort === "top-rated") {
+    return sortedGames.sort((a, b) => {
+      const ratingDiff =
+        toNumber(b.rating_percent) - toNumber(a.rating_percent);
+
+      if (ratingDiff !== 0) return ratingDiff;
+
+      return toNumber(b.total_reviews) - toNumber(a.total_reviews);
+    });
+  }
+
+  if (sort === "most-played") {
+    return sortedGames.sort((a, b) => {
+      return toNumber(b.average_playtime) - toNumber(a.average_playtime);
+    });
+  }
+
+  return sortedGames.sort((a, b) => {
+    return toNumber(b.trending_score) - toNumber(a.trending_score);
+  });
+};
+
 const buildBrowseText = ({ genres, categories, tags }) => {
   return normalizeText(`
     ${genres || ""}
@@ -80,14 +107,117 @@ const buildBrowseText = ({ genres, categories, tags }) => {
   `);
 };
 
+const normalize = (value = "") => {
+  return String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+const toNumber = (value) => {
+  const num = Number(value);
+
+  return Number.isFinite(num) ? num : 0;
+};
+
+const paginate = (items = [], page = 1, limit = 15) => {
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+
+  return {
+    page,
+    limit,
+    total: items.length,
+    totalPages: Math.ceil(items.length / limit),
+    data: items.slice(startIndex, endIndex),
+  };
+};
+
+const getGameTerms = (game) => {
+  return [
+    ...(Array.isArray(game.genreList) ? game.genreList : []),
+    ...(Array.isArray(game.tagList) ? game.tagList : []),
+    ...(Array.isArray(game.categoryList) ? game.categoryList : []),
+    game.genres,
+    game.tags,
+    game.categories,
+  ]
+    .filter(Boolean)
+    .map(normalize);
+};
+
+const matchesTerm = (game, term) => {
+  if (!term) return true;
+
+  const normalizedTerm = normalize(term);
+
+  if (!normalizedTerm) return true;
+
+  const terms = getGameTerms(game);
+
+  return terms.some((item) => {
+    return item === normalizedTerm || item.includes(normalizedTerm);
+  });
+};
+
+const filterByMinYear = (games = [], minYear) => {
+  if (!minYear) return games;
+
+  const year = Number(minYear);
+
+  if (!Number.isFinite(year)) return games;
+
+  return games.filter((game) => {
+    const releaseYear = Number(game.release_year);
+
+    return Number.isFinite(releaseYear) && releaseYear >= year;
+  });
+};
+
+const filterGames = ({ games = [], minYear, genre, tag, category } = {}) => {
+  let result = Array.isArray(games) ? games : [];
+
+  result = filterByMinYear(result, minYear);
+
+  if (genre) {
+    result = result.filter((game) => matchesTerm(game, genre));
+  }
+
+  if (tag) {
+    result = result.filter((game) => matchesTerm(game, tag));
+  }
+
+  if (category) {
+    const categoryTerms = String(category)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    result = result.filter((game) => {
+      return categoryTerms.some((term) => matchesTerm(game, term));
+    });
+  }
+
+  return result;
+};
+
 const parseGames = () => {
-  return new Promise((resolve, reject) => {
-    if (cachedGames && gamesMap) {
-      return resolve({
-        games: cachedGames,
-        map: gamesMap,
-      });
-    }
+  if (cachedGames && gamesMap) {
+    return Promise.resolve({
+      games: cachedGames,
+      map: gamesMap,
+      cached: true,
+      loadedAt: cacheLoadedAt,
+    });
+  }
+
+  if (loadingPromise) {
+    return loadingPromise;
+  }
+
+  loadingPromise = new Promise((resolve, reject) => {
+    console.log("[CACHE] Loading games_ui.csv into memory...");
 
     const results = [];
     const map = new Map();
@@ -117,6 +247,9 @@ const parseGames = () => {
             null;
         }
 
+        const platforms = data.platforms || "";
+        const platformList = safeJsonParse(data.platforms_list, []);
+
         const genres = data.genres || "";
         const categories = data.categories || "";
         const tags = data.tags_text || "";
@@ -144,17 +277,17 @@ const parseGames = () => {
           developer: data.developer,
           publisher: data.publisher,
 
-          // raw text fields
+          platforms,
+          platformList,
+
           genres,
           categories,
           tags,
 
-          // extracted arrays
           genreList,
           categoryList,
           tagList,
 
-          // combined searchable/browsable fields
           browseText,
           browseTerms,
 
@@ -186,33 +319,99 @@ const parseGames = () => {
       .on("end", () => {
         cachedGames = results;
         gamesMap = map;
+        cacheLoadedAt = new Date().toISOString();
+        loadingPromise = null;
+
+        console.log(`[CACHE] Loaded ${results.length} games into memory.`);
 
         resolve({
-          games: results,
-          map,
+          games: cachedGames,
+          map: gamesMap,
+          cached: false,
+          loadedAt: cacheLoadedAt,
         });
       })
-      .on("error", reject);
+      .on("error", (err) => {
+        loadingPromise = null;
+        reject(err);
+      });
   });
+
+  return loadingPromise;
 };
 
-const loadGames = async ({ page = 1, limit = 15 }) => {
-  const { games } = await parseGames();
-
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-
-  const paginatedGames = games
-    .slice(startIndex, endIndex)
-    .map((game) => toGameCard(game));
+const warmGameCache = async () => {
+  await parseGames();
 
   return {
-    page,
-    limit,
-    total: games.length,
-    totalPages: Math.ceil(games.length / limit),
-    data: paginatedGames,
+    message: "Game cache warmed",
+    total: cachedGames?.length || 0,
+    loadedAt: cacheLoadedAt,
   };
+};
+
+const clearGameCache = () => {
+  cachedGames = null;
+  gamesMap = null;
+  loadingPromise = null;
+  cacheLoadedAt = null;
+
+  return {
+    message: "Game cache cleared",
+  };
+};
+
+const getGameCacheStatus = () => {
+  return {
+    cached: Boolean(cachedGames && gamesMap),
+    total: cachedGames?.length || 0,
+    loadedAt: cacheLoadedAt,
+  };
+};
+
+const loadGames = async ({
+  page = 1,
+  limit = 15,
+  minYear,
+  genre,
+  tag,
+  category,
+  sort = "trending",
+  minReviews = 0,
+} = {}) => {
+  const { games } = await parseGames();
+
+  let filteredGames = filterGames({
+    games,
+    minYear,
+    genre,
+    tag,
+    category,
+  });
+
+  if (sort === "top-rated") {
+    filteredGames = filteredGames.filter((game) => {
+      return toNumber(game.total_reviews) >= minReviews;
+    });
+  }
+
+  if (sort === "most-played") {
+    filteredGames = filteredGames.filter((game) => {
+      return toNumber(game.average_playtime) > 0;
+    });
+  }
+
+  if (sort === "trending") {
+    filteredGames = filteredGames.filter((game) => {
+      return toNumber(game.trending_score) > 0;
+    });
+  }
+
+  const sortedGames = sortGames(filteredGames, sort).map((game) =>
+    toGameCard(game),
+  );
+
+  return paginate(sortedGames, page, limit);
 };
 
 const getGameById = async (appid) => {
@@ -228,4 +427,7 @@ module.exports = {
   loadGames,
   getGameById,
   parseGames,
+  warmGameCache,
+  clearGameCache,
+  getGameCacheStatus,
 };

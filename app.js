@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+const path = require("path")
 const express = require("express");
 const cors = require("cors");
 
@@ -11,15 +12,22 @@ const discoverRoutes = require("./modules/discover/routes");
 const prefRoutes = require("./modules/preferences/routes");
 const gameRoutes = require("./modules/games/routes");
 const searchRoutes = require("./modules/search/routes");
+const reviewRoutes = require("./modules/reviews/routes")
+const profileRoutes = require("./modules/profile/routes")
+
 const authMiddleware = require("./middleware/auth");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 
 // hit
 app.use("/api/auth", authRoutes);
+
+app.use("/api/profile", profileRoutes)
 
 // hit
 app.use("/api/games", gameRoutes);
@@ -41,6 +49,8 @@ app.use("/api/recommendations", authMiddleware, recRoutes);
 
 // hit
 app.use("/api/preferences", authMiddleware, prefRoutes);
+
+app.use("/api/reviews", reviewRoutes)
 
 app.get("/", (req, res) => {
   res.send("BACKEND RUNNING!");

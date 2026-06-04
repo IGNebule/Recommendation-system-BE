@@ -6,10 +6,15 @@ const getTrendingGames = async (req, res) => {
     const limit = Number(req.query.limit) || 15;
     const minYear = Number(req.query.minYear) || undefined
 
+    const {genre, tag, category} = req.query
+
     const result = await service.getTrendingGames({
       page,
       limit,
       minYear,
+      genre,
+      tag,
+      category,
     });
 
     return res.json({
@@ -33,11 +38,16 @@ const getTopRatedGames = async (req, res) => {
     const minReviews = Number(req.query.minReviews) || 100;
     const minYear = Number(req.query.minYear) || undefined;
 
+    const { genre, tag, category } = req.query;
+
     const result = await service.getTopRatedGames({
       page,
       limit,
       minReviews,
-      minYear
+      minYear,
+      genre,
+      tag,
+      category,
     });
 
     return res.json({
@@ -61,10 +71,15 @@ const getMostPlayedGames = async (req, res) => {
     const limit = Number(req.query.limit) || 15;
     const minYear = Number(req.query.minYear) || undefined;
 
+    const { genre, tag, category } = req.query;
+
     const result = await service.getMostPlayedGames({
       page,
       limit,
-      minYear
+      minYear,
+      genre,
+      tag,
+      category
     });
 
     return res.json({
